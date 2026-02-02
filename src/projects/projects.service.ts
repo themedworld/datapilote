@@ -19,6 +19,7 @@ import { SprintITEntity } from './entities/SprintITEntity.entity';
 import { TaskITEntity } from './entities/TaskITEntity.entity';
 import { CreateSprintITDto } from './dto/create-sprint-it.dto';
 import { CreateTaskITDto } from './dto/create-task-it.dto';
+
 @Injectable()
 export class ProjectsService {
   constructor(
@@ -28,24 +29,25 @@ export class ProjectsService {
     @InjectRepository(UserEntity)
     private userRepo: Repository<UserEntity>,
 
-      @InjectRepository(ProjectITEntity)
-  private projectITRepo: Repository<ProjectITEntity>,
+    @InjectRepository(ProjectITEntity)
+    private projectITRepo: Repository<ProjectITEntity>,
 
-  @InjectRepository(ProjectMarketingEntity)
-  private projectMarketingRepo: Repository<ProjectMarketingEntity>,
+    @InjectRepository(ProjectMarketingEntity)
+    private projectMarketingRepo: Repository<ProjectMarketingEntity>,
 
-  @InjectRepository(ProjectCallCenterEntity)
-  private projectCallCenterRepo: Repository<ProjectCallCenterEntity>,
-  @InjectRepository(SprintITEntity)
+    @InjectRepository(ProjectCallCenterEntity)
+    private projectCallCenterRepo: Repository<ProjectCallCenterEntity>,
+
+    @InjectRepository(SprintITEntity)
     private sprintITRepo: Repository<SprintITEntity>,
 
-  @InjectRepository(TaskITEntity)
+    @InjectRepository(TaskITEntity)
     private taskITRepo: Repository<TaskITEntity>,
   ) {}
 
   // 🔹 Manager crée projet
   async create(dto: CreateProjectDto, manager: UserEntity) {
-    if (!manager.company) {
+    if (!manager || !manager.company) {
       throw new ForbiddenException('Manager has no company assigned');
     }
 
@@ -71,7 +73,7 @@ export class ProjectsService {
 
     if (!project) throw new NotFoundException('Project not found');
 
-    if (project.company.id !== manager.company?.id) {
+    if (!manager || !manager.company || project.company.id !== manager.company.id) {
       throw new ForbiddenException('You cannot assign PM to a project from another company');
     }
 
@@ -82,7 +84,7 @@ export class ProjectsService {
 
     if (!pm) throw new NotFoundException('Project Manager not found');
 
-    if (pm.company?.id !== manager.company?.id) {
+    if (!pm.company || pm.company.id !== manager.company.id) {
       throw new ForbiddenException('PM belongs to a different company');
     }
 
@@ -107,6 +109,8 @@ export class ProjectsService {
       throw new ForbiddenException('You are not the Project Manager of this project');
     }
 
+    if (!project.company) throw new NotFoundException('Project company not found');
+
     const members = await this.userRepo.find({
       where: {
         id: In(memberIds),
@@ -118,7 +122,6 @@ export class ProjectsService {
 
     return this.projectRepo.save(project);
   }
-
 
   // 🔹 Voir tous les projets
   async findAll() {
@@ -187,10 +190,29 @@ export class ProjectsService {
     }
   }
 
-async createSprintsWithTasks(
+  // 🔹 Récupérer les sprints d'un project IT (exposé via service)
+  async getSprintsOfProjectIT(projectId: number): Promise<SprintITEntity[]> {
+    const projectIT = await this.projectITRepo.findOne({
+      where: { id: projectId },
+      relations: ['sprints', 'sprints.tasks'],
+    });
+    if (!projectIT) throw new NotFoundException('Project IT not found');
+    return projectIT.sprints;
+  }
+
+  // 🔹 Récupérer les tâches d'un sprint (exposé via service)
+  async getTasksOfSprint(sprintId: number): Promise<TaskITEntity[]> {
+    const sprint = await this.sprintITRepo.findOne({
+      where: { id: sprintId },
+      relations: ['tasks'],
+    });
+    if (!sprint) throw new NotFoundException('Sprint not found');
+    return sprint.tasks;
+  }
+
+  async createSprintsWithTasks(
     projectId: number,
     sprintsDto: CreateSprintITDto[],
-    projectITRepo?: Repository<ProjectITEntity>,
   ): Promise<SprintITEntity[]> {
     // Récupérer le projet IT
     const projectIT = await this.projectITRepo.findOne({ where: { id: projectId } });
@@ -249,43 +271,129 @@ async createSprintsWithTasks(
 
     return createdSprints;
   }
+
   async addTaskToSprint(
-  sprintId: number,
-  taskDto: CreateTaskITDto,
-): Promise<TaskITEntity> {
-  // 1️⃣ Récupérer le sprint
-  const sprint = await this.sprintITRepo.findOne({
-    where: { id: sprintId },
-    relations: ['tasks'],
-  });
-  if (!sprint) throw new NotFoundException('Sprint IT not found');
+    sprintId: number,
+    taskDto: CreateTaskITDto,
+  ): Promise<TaskITEntity> {
+    // 1️⃣ Récupérer le sprint
+    const sprint = await this.sprintITRepo.findOne({
+      where: { id: sprintId },
+      relations: ['tasks'],
+    });
+    if (!sprint) throw new NotFoundException('Sprint IT not found');
 
-  // 2️⃣ Créer la tâche et l'associer au sprint
-  const task = this.taskITRepo.create({
-    title: taskDto.title,
-    description: taskDto.description,
-    type: taskDto.type,
-    status: taskDto.status,
-    priority: taskDto.priority,
-    storyPoints: taskDto.storyPoints,
-    estimatedHours: taskDto.estimatedHours,
-    dependencies: taskDto.dependencies,
-    risks: taskDto.risks,
-    complexity: taskDto.complexity,
-    additionalNotes: taskDto.additionalNotes,
-    sprint: sprint,
-  });
+    // 2️⃣ Créer la tâche et l'associer au sprint
+    const task = this.taskITRepo.create({
+      title: taskDto.title,
+      description: taskDto.description,
+      type: taskDto.type,
+      status: taskDto.status,
+      priority: taskDto.priority,
+      storyPoints: taskDto.storyPoints,
+      estimatedHours: taskDto.estimatedHours,
+      dependencies: taskDto.dependencies,
+      risks: taskDto.risks,
+      complexity: taskDto.complexity,
+      additionalNotes: taskDto.additionalNotes,
+      sprint: sprint,
+    });
 
-  // 3️⃣ Optionnel : assigner un utilisateur si provided
-  if (taskDto.assignedToId) {
-    task.assignedTo = { id: taskDto.assignedToId } as UserEntity;
+    // 3️⃣ Optionnel : assigner un utilisateur si provided
+    if (taskDto.assignedToId) {
+      task.assignedTo = { id: taskDto.assignedToId } as UserEntity;
+    }
+
+    // 4️⃣ Sauvegarder la tâche
+    const savedTask = await this.taskITRepo.save(task);
+
+    return savedTask;
   }
 
-  // 4️⃣ Sauvegarder la tâche
-  const savedTask = await this.taskITRepo.save(task);
+  async assignTaskToMember(
+    taskId: number,          // ID de la tâche à assigner
+    memberId: number,        // ID du membre à qui assigner
+    projectManager: UserEntity, // Le Project Manager qui effectue l'action
+  ): Promise<TaskITEntity> {
+    // 1️⃣ Récupérer la tâche avec le sprint et le projet IT
+    const task = await this.taskITRepo.findOne({
+      where: { id: taskId },
+      relations: ['sprint', 'sprint.projectIT', 'sprint.projectIT.project'],
+    });
 
-  return savedTask;
-}
+    if (!task) throw new NotFoundException('Task not found');
 
+    // 2���⃣ Vérifier que le Project Manager gère bien le projet
+    const projectIT = task.sprint.projectIT;
+    if (!projectIT || !projectIT.project) {
+      throw new NotFoundException('Project IT or parent project not found');
+    }
 
+    const project = await this.projectRepo.findOne({
+      where: { id: projectIT.project.id },
+      relations: ['manager', 'manager.company'],
+    });
+
+    if (!project) throw new NotFoundException('Project not found');
+
+    if (project.manager?.id !== projectManager.id) {
+      throw new ForbiddenException('You are not the Project Manager of this project');
+    }
+
+    // 3️⃣ Vérifier que le membre appartient à la même entreprise
+    if (!project.manager || !project.manager.company) {
+      throw new NotFoundException('Project manager or company not configured for this project');
+    }
+
+    const companyId = project.manager.company.id;
+
+    const member = await this.userRepo.findOne({
+      where: { id: memberId, company: { id: companyId } },
+    });
+
+    if (!member) throw new NotFoundException('Member not found in your company');
+
+    // 4️⃣ Assigner le membre à la tâche
+    task.assignedTo = member;
+
+    // 5️⃣ Sauvegarder et retourner la tâche
+    return this.taskITRepo.save(task);
+  }
+
+  async assignProjectToPM(
+    projectId: number,       // ID du projet à affecter
+    pmId: number,            // ID du Project Manager
+    manager: UserEntity,     // Le manager qui effectue l'action
+  ): Promise<ProjectEntity> {
+    // 1️⃣ Récupérer le projet avec son manager actuel et la société
+    const project = await this.projectRepo.findOne({
+      where: { id: projectId },
+      relations: ['company', 'manager'],
+    });
+
+    if (!project) throw new NotFoundException('Project not found');
+
+    // 2️⃣ Vérifier que le manager courant appartient à la même société
+    if (!manager || !manager.company || project.company.id !== manager.company.id) {
+      throw new ForbiddenException('You cannot assign a PM to a project from another company');
+    }
+
+    // 3️⃣ Vérifier que le Project Manager existe et appartient à la même société
+    const pm = await this.userRepo.findOne({
+      where: { id: pmId, role: UserRole.PROJECT_MANAGER },
+      relations: ['company'],
+    });
+
+    if (!pm) throw new NotFoundException('Project Manager not found');
+
+    if (!pm.company || pm.company.id !== manager.company.id) {
+      throw new ForbiddenException('The PM belongs to a different company');
+    }
+
+    // 4️⃣ Affecter le Project Manager au projet
+    project.manager = pm;
+
+    // 5️⃣ Sauvegarder et retourner le projet mis à jour
+    return this.projectRepo.save(project);
+  }
 }

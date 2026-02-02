@@ -11,6 +11,7 @@ async function bootstrap() {
 
   app.use(cors({
     origin: ['http://localhost:3000',
+      'datapilote-front-3r96-94ua1g0ij-themedworlds-projects.vercel.app',
 
               ],
     credentials: true,
