@@ -11,7 +11,7 @@ async function bootstrap() {
 
   app.use(cors({
     origin: ['http://localhost:3000',
-      'https://datapilote-front-33zx.vercel.app',
+      'https://datapilote-front-we6x.vercel.app',
 
               ],
     credentials: true,
