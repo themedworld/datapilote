@@ -11,6 +11,7 @@ import {TerrainEntity} from 'src/terrain/entities/terrain.entity';
 export enum UserRole {
   MEMBER = 'client',
   SUPER_ADMIN = 'super_admin',
+  COMPABY8ADMIN='admin_company'
 }
 
 @Entity('users')
