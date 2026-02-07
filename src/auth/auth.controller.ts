@@ -23,39 +23,34 @@ export class AuthController {
     return this.authService.signin(email, password);
   }
 
-  //Creation de super_Admin
+  // -------------------- CREATION DU SUPER ADMIN (INIT SEULEMENT) --------------------
   @Post('signup')
   async signup(@Body() createUserDto: CreateUserDto) {
     return this.authService.signup(createUserDto);
   }
 
-  // -------------------- CRÉATION UTILISATEUR HIÉRARCHIQUE --------------------
+  // -------------------- CREATION D'UN MEMBER --------------------
   @Post('create-user')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(
-    UserRole.SUPER_ADMIN,
-    UserRole.ADMIN_COMPANY,
-    UserRole.MANAGER,
-    UserRole.PROJECT_MANAGER,
-  )
+  @Roles(UserRole.SUPER_ADMIN) // Seul SUPER_ADMIN peut créer des utilisateurs
   async createUser(
     @Req() req: RequestWithUser,
-    @Body() body: CreateUserDto & { role: UserRole; companyId?: number },
+    @Body() body: CreateUserDto & { role: UserRole },
   ) {
     const creator = req.user;
-    const { role, companyId, ...userData } = body;
+    const { role, ...userData } = body;
 
-    // Le service décide si companyId doit être forcé selon la hiérarchie
-    return this.authService.createUser(creator, userData, role, companyId);
+    // Le rôle doit être SUPER_ADMIN ou MEMBER
+    return this.authService.createUser(creator, userData, role);
   }
 
-  // -------------------- ROUTE TEST ADMIN --------------------
+  // -------------------- ROUTE TEST SUPER_ADMIN --------------------
   @Get('admin-data')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN_COMPANY)
+  @Roles(UserRole.SUPER_ADMIN)
   getAdminData(@Req() req: RequestWithUser) {
     return {
-      message: 'Données réservées aux admins',
+      message: 'Données réservées aux SUPER_ADMIN',
       user: req.user,
     };
   }
@@ -63,16 +58,10 @@ export class AuthController {
   // -------------------- ROUTE TEST MEMBRE --------------------
   @Get('member-data')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(
-    UserRole.MEMBER,
-    UserRole.MANAGER,
-    UserRole.PROJECT_MANAGER,
-    UserRole.ADMIN_COMPANY,
-    UserRole.SUPER_ADMIN,
-  )
+  @Roles(UserRole.SUPER_ADMIN, UserRole.MEMBER)
   getMemberData(@Req() req: RequestWithUser) {
     return {
-      message: 'Données accessibles aux membres et admins',
+      message: 'Données accessibles aux SUPER_ADMIN et MEMBER',
       user: req.user,
     };
   }

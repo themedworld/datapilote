@@ -3,18 +3,13 @@ import {
   Column, 
   PrimaryGeneratedColumn, 
   CreateDateColumn, 
-  UpdateDateColumn, 
-  ManyToOne, 
-  OneToMany 
+  UpdateDateColumn,
+  OneToMany
 } from 'typeorm';
-import { ProjectEntity } from 'src/projects/entities/project.entity';
-import { CompanyEntity } from 'src/companies/entities/company.entity';
+import {TerrainEntity} from 'src/terrain/entities/terrain.entity';
 
 export enum UserRole {
-  MANAGER = 'manager',
-  PROJECT_MANAGER = 'project_manager',
-  MEMBER = 'member',
-  ADMIN_COMPANY = 'admin_company',
+  MEMBER = 'client',
   SUPER_ADMIN = 'super_admin',
 }
 
@@ -29,7 +24,7 @@ export class UserEntity {
   @Column({ unique: true })
   numtel: string;
 
-  @Column({ nullable: false })
+  @Column()
   fullname: string;
 
   @Column({ select: false })
@@ -41,23 +36,8 @@ export class UserEntity {
     default: UserRole.MEMBER,
   })
   role: UserRole;
-
-  // 🔑 Multi-société
-  @ManyToOne(() => CompanyEntity, company => company.users, {
-    nullable: true, // SUPER_ADMIN n’a pas de société
-    onDelete: 'SET NULL',
-  })
-  company?: CompanyEntity | null;
-
-  // 🔹 Relations projets
-  @OneToMany(() => ProjectEntity, project => project.manager)
-  managedProjects: ProjectEntity[];
-
-  @OneToMany(() => ProjectEntity, project => project.assignedTo)
-  assignedProjects: ProjectEntity[];
-
-  @Column({ default: true })
-  isActive: boolean;
+  @OneToMany(() => TerrainEntity, terrain => terrain.client)
+  terrains: TerrainEntity[];
 
   @CreateDateColumn()
   createdAt: Date;

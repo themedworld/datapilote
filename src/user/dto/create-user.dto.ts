@@ -20,7 +20,5 @@ export class CreateUserDto {
   @IsEnum(UserRole)
   role?: UserRole;
 
-  @IsOptional()
-  @Type(() => Number)
-  companyId?: number; // Id de la société si applicable
+
 }

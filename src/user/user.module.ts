@@ -4,15 +4,13 @@ import { UserService } from './user.service';
 import { UserController } from './user.controller';
 import { UserEntity } from './entities/user.entity';
 import { AuthModule } from '../auth/auth.module';
-import { CompaniesModule } from '../companies/companies.module';
-import { ProjectsModule } from '../projects/projects.module';
+import { TerrainModule } from '../terrain/terrain.module'; // Si tu veux injecter TerrainService dans UserService
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([UserEntity]),
     forwardRef(() => AuthModule),
-    forwardRef(() => CompaniesModule),
-    forwardRef(() => ProjectsModule),
+    forwardRef(() => TerrainModule), // optionnel si tu veux gérer les terrains depuis le user
   ],
   controllers: [UserController],
   providers: [UserService],
